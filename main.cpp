@@ -2,17 +2,15 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/dnn.hpp>
 #include <opencv2/dnn/shape_utils.hpp>
-
-#define CAMERA_NOT_AVAILABLE 1100
-#define MODEL_NOT_AVAILABLE 1200
-#define CONFIDENCE_LEVEL 0.93
+#include "src/camera/CameraUtils.h"
+#include "src/model/ModelUtils.h"
 
 const int width = 300;
 const int height = 300;
 
-const static std::string FACE_DNN_PROTO = "models/face/deploy.prototxt.txt";
-const static std::string FACE_DNN_MODEL = "models/face/res10_300x300_ssd_iter_140000.caffemodel";
-const static auto dark_green = cv::Scalar(50, 180, 0);
+
+const auto fps_text_point = cv::Point(25, 25);
+const auto dark_green = cv::Scalar(50, 180, 0);
 
 int main() {
     auto cap = cv::VideoCapture(0);
@@ -21,12 +19,11 @@ int main() {
         return CAMERA_NOT_AVAILABLE;
     }
 
-    cap.set(CV_CAP_PROP_FRAME_WIDTH, width);
-    cap.set(CV_CAP_PROP_FRAME_HEIGHT, height);
+    CameraUtils::set_up(cap, cv::Size(width, height));
 
     auto fps = static_cast<int>(cap.get(CV_CAP_PROP_FPS));
 
-    auto net = cv::dnn::readNetFromCaffe(FACE_DNN_PROTO, FACE_DNN_MODEL);
+    auto net = cv::dnn::readNetFromCaffe(flv::FACE_DNN_PROTO, flv::FACE_DNN_MODEL);
 
     if (net.empty()) {
         return MODEL_NOT_AVAILABLE;
@@ -42,7 +39,9 @@ int main() {
         }
         cv::flip(frame, frame, 1);
 
-        auto blob = cv::dnn::blobFromImage(frame, 1.0, cv::Size{width, height}, 1.0);
+        cv::Mat blob;
+        flv::ModelUtils::blob_from_image(frame, blob, cv::Size(width, height));
+
         net.setInput(blob);
         auto res = net.forward();
 
@@ -65,9 +64,10 @@ int main() {
         }
 
         std::stringstream stream;
-        stream << "Confidence:" << std::setprecision(2) << fps;
-        cv::putText(frame, stream.str(), cv::Point{25, 25}, CV_FONT_NORMAL, 1, dark_green);
-        cv::imshow("Camera Test", frame);
+        stream << "FPS:" << std::setprecision(2) << fps;
+        cv::putText(frame, stream.str(), fps_text_point, CV_FONT_NORMAL, 1, dark_green);
+
+        cv::imshow("Visor", frame);
 
         if (cv::waitKey(30) >= 0) {
             break;
