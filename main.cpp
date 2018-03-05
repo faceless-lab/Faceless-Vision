@@ -1,6 +1,7 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <opencv2/dnn.hpp>
+#include <opencv2/tracking.hpp>
 #include <opencv2/dnn/shape_utils.hpp>
 #include "src/camera/CameraUtils.h"
 #include "src/model/ModelUtils.h"
@@ -29,6 +30,10 @@ int main() {
         return MODEL_NOT_AVAILABLE;
     }
 
+    cv::Ptr<cv::Tracker> tracker = cv::TrackerKCF::create();
+    bool wasInit = false;
+    cv::Rect2d bbox;
+
     while (true) {
         int64 start = cv::getTickCount();
 
@@ -55,11 +60,28 @@ int main() {
                 const auto right = static_cast<int>(res.at<float>(i, 5) * frame.cols);
                 const auto bottom = static_cast<int>(res.at<float>(i, 6) * frame.rows);
 
-                rectangle(frame, cv::Point(left, top), cv::Point(right, bottom),
-                          dark_green);
+                const cv::Point top_pt(left, top);
+                const cv::Point bot_pt(right, bottom);
+
+                rectangle(frame, top_pt, bot_pt, dark_green);
+
                 std::stringstream stream;
                 stream << "Confidence:" << std::setprecision(2) << confidence;
-                cv::putText(frame, stream.str(), cv::Point(left, top), CV_FONT_NORMAL, 0.5, dark_green);
+                cv::putText(frame, stream.str(), top_pt, CV_FONT_NORMAL, 0.5, dark_green);
+
+                if (!wasInit) {
+                    bbox = cv::Rect2d(top_pt, bot_pt);
+                    tracker->init(frame, bbox);
+                    wasInit = true;
+                }
+            }
+        }
+
+        if (wasInit) {
+            if (tracker->update(frame, bbox)) {
+                cv::rectangle(frame, bbox, cv::Scalar( 255, 0, 0 ), 2);
+            } else {
+                wasInit = false;
             }
         }
 
