@@ -8,8 +8,13 @@
 
 #define CAMERA_NOT_AVAILABLE 1100
 
-class CameraUtils {
+namespace flv {
+    class CameraUtils {
 
-public:
-    static void set_up(cv::VideoCapture& cap, cv::Size size);
-};
+    public:
+        static void set_up(cv::VideoCapture& cap, cv::Size size);
+
+
+    };
+}
+

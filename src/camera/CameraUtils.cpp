@@ -7,7 +7,7 @@
 #include <opencv2/imgproc.hpp>
 #include "CameraUtils.h"
 
-void CameraUtils::set_up(cv::VideoCapture &cap, cv::Size size) {
+void flv::CameraUtils::set_up(cv::VideoCapture &cap, cv::Size size) {
     cap.set(CV_CAP_PROP_FRAME_WIDTH, size.width);
     cap.set(CV_CAP_PROP_FRAME_HEIGHT, size.height);
 }

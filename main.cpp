@@ -5,13 +5,14 @@
 #include <opencv2/dnn/shape_utils.hpp>
 #include "src/camera/CameraUtils.h"
 #include "src/model/ModelUtils.h"
+#include "src/types/Face.h"
 
 const int width = 300;
 const int height = 300;
 
-
 const auto fps_text_point = cv::Point(25, 25);
 const auto dark_green = cv::Scalar(50, 180, 0);
+const auto dark_blue = cv::Scalar(180, 50, 0);
 
 int main() {
     auto cap = cv::VideoCapture(0);
@@ -20,7 +21,7 @@ int main() {
         return CAMERA_NOT_AVAILABLE;
     }
 
-    CameraUtils::set_up(cap, cv::Size(width, height));
+    flv::CameraUtils::set_up(cap, cv::Size(width, height));
 
     auto fps = static_cast<int>(cap.get(CV_CAP_PROP_FPS));
 
@@ -34,6 +35,7 @@ int main() {
     bool wasInit = false;
     cv::Rect2d bbox;
 
+    bool tracking = false;
     while (true) {
         int64 start = cv::getTickCount();
 
@@ -44,44 +46,51 @@ int main() {
         }
         cv::flip(frame, frame, 1);
 
-        cv::Mat blob;
-        flv::ModelUtils::blob_from_image(frame, blob, cv::Size(width, height));
+        if (!tracking) {
+            cv::Mat blob;
+            flv::ModelUtils::blob_from_image(frame, blob, cv::Size(width, height));
 
-        net.setInput(blob);
-        auto res = net.forward();
+            net.setInput(blob);
+            auto res = net.forward();
 
-        res = res.reshape(1, static_cast<int>(res.total() / 7));
-        for (int i = 0; i < res.rows; i++) {
-            float confidence = res.at<float>(i, 2);
+            res = res.reshape(1, static_cast<int>(res.total() / 7));
+            for (int i = 0; i < res.rows; i++) {
+                float confidence = res.at<float>(i, 2);
 
-            if (confidence > CONFIDENCE_LEVEL) {
-                const auto left = static_cast<int>(res.at<float>(i, 3) * frame.cols);
-                const auto top = static_cast<int>(res.at<float>(i, 4) * frame.rows);
-                const auto right = static_cast<int>(res.at<float>(i, 5) * frame.cols);
-                const auto bottom = static_cast<int>(res.at<float>(i, 6) * frame.rows);
+                if (confidence > CONFIDENCE_LEVEL) {
+                    const auto left = res.at<float>(i, 3) * frame.cols;
+                    const auto top = res.at<float>(i, 4) * frame.rows;
+                    const auto right = res.at<float>(i, 5) * frame.cols;
+                    const auto bottom = res.at<float>(i, 6) * frame.rows;
 
-                const cv::Point top_pt(left, top);
-                const cv::Point bot_pt(right, bottom);
+                    flv::Face<float> face(left, top, right, bottom);
 
-                rectangle(frame, top_pt, bot_pt, dark_green);
+                    const auto lt = face.get_lt();
+                    cv::rectangle(frame, lt, face.get_rb(), dark_green);
 
-                std::stringstream stream;
-                stream << "Confidence:" << std::setprecision(2) << confidence;
-                cv::putText(frame, stream.str(), top_pt, CV_FONT_NORMAL, 0.5, dark_green);
+                    std::stringstream stream;
+                    stream << "Confidence:" << std::setprecision(2) << confidence;
+                    cv::putText(frame, stream.str(), lt, CV_FONT_NORMAL, 0.5, dark_green);
 
-                if (!wasInit) {
-                    bbox = cv::Rect2d(top_pt, bot_pt);
-                    tracker->init(frame, bbox);
-                    wasInit = true;
+                    if (!wasInit) {
+                        bbox = face.get_bbox();
+                        tracker->init(frame, bbox);
+                        wasInit = true;
+                    }
                 }
             }
+
+            blob.release();
+            res.release();
         }
 
         if (wasInit) {
             if (tracker->update(frame, bbox)) {
-                cv::rectangle(frame, bbox, cv::Scalar( 255, 0, 0 ), 2);
+                tracking = true;
+                cv::rectangle(frame, bbox, dark_blue, 2);
             } else {
-                wasInit = false;
+                tracking = wasInit = false;
+                tracker.empty();
             }
         }
 
@@ -98,6 +107,7 @@ int main() {
         fps = static_cast<int>(cv::getTickFrequency() / (cv::getTickCount() - start));
     }
 
+    tracker.release();
     cap.release();
 
     std::cout << "End of program\n";
