@@ -1,18 +1,17 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
-#include <opencv2/dnn.hpp>
 #include <opencv2/tracking.hpp>
 #include <opencv2/dnn/shape_utils.hpp>
 #include "src/camera/CameraUtils.h"
 #include "src/model/ModelUtils.h"
 #include "src/types/Face.h"
 
+#define TOP_LEFT_CORNER cv::Point(25, 25)
+#define DARK_GREEN cv::Scalar(50, 180, 0)
+#define DARK_BLUE cv::Scalar(180, 50, 0)
+
 const int width = 300;
 const int height = 300;
-
-const auto fps_text_point = cv::Point(25, 25);
-const auto dark_green = cv::Scalar(50, 180, 0);
-const auto dark_blue = cv::Scalar(180, 50, 0);
 
 int main() {
     auto cap = cv::VideoCapture(0);
@@ -24,7 +23,6 @@ int main() {
     flv::CameraUtils::set_up(cap, cv::Size(width, height));
 
     auto fps = static_cast<int>(cap.get(CV_CAP_PROP_FPS));
-
     auto net = cv::dnn::readNetFromCaffe(flv::FACE_DNN_PROTO, flv::FACE_DNN_MODEL);
 
     if (net.empty()) {
@@ -32,9 +30,7 @@ int main() {
     }
 
     cv::Ptr<cv::Tracker> tracker = cv::TrackerKCF::create();
-    bool wasInit = false;
     cv::Rect2d bbox;
-
     bool tracking = false;
     while (true) {
         int64 start = cv::getTickCount();
@@ -54,6 +50,7 @@ int main() {
             auto res = net.forward();
 
             res = res.reshape(1, static_cast<int>(res.total() / 7));
+
             for (int i = 0; i < res.rows; i++) {
                 float confidence = res.at<float>(i, 2);
 
@@ -66,17 +63,14 @@ int main() {
                     flv::Face<float> face(left, top, right, bottom);
 
                     const auto lt = face.get_lt();
-                    cv::rectangle(frame, lt, face.get_rb(), dark_green);
+                    cv::rectangle(frame, lt, face.get_rb(), DARK_GREEN);
 
                     std::stringstream stream;
                     stream << "Confidence:" << std::setprecision(2) << confidence;
-                    cv::putText(frame, stream.str(), lt, CV_FONT_NORMAL, 0.5, dark_green);
+                    cv::putText(frame, stream.str(), lt, CV_FONT_NORMAL, 0.5, DARK_GREEN);
 
-                    if (!wasInit) {
-                        bbox = face.get_bbox();
-                        tracker->init(frame, bbox);
-                        wasInit = true;
-                    }
+                    bbox = face.get_bbox();
+                    tracker->init(frame, bbox);
                 }
             }
 
@@ -84,19 +78,19 @@ int main() {
             res.release();
         }
 
-        if (wasInit) {
-            if (tracker->update(frame, bbox)) {
-                tracking = true;
-                cv::rectangle(frame, bbox, dark_blue, 2);
-            } else {
-                tracking = wasInit = false;
-                tracker.empty();
-            }
+        if (tracker->update(frame, bbox)) {
+            tracking = true;
+            cv::rectangle(frame, bbox, DARK_BLUE, 2);
+            cv::putText(frame, "Tracking", bbox.tl(), CV_FONT_NORMAL, 0.5, DARK_BLUE);
+        } else {
+            tracking = false;
+            tracker.release();
+            tracker = cv::TrackerKCF::create();
         }
 
         std::stringstream stream;
         stream << "FPS:" << std::setprecision(2) << fps;
-        cv::putText(frame, stream.str(), fps_text_point, CV_FONT_NORMAL, 1, dark_green);
+        cv::putText(frame, stream.str(), TOP_LEFT_CORNER, CV_FONT_NORMAL, 1, DARK_GREEN);
 
         cv::imshow("Visor", frame);
 

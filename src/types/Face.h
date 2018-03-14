@@ -40,22 +40,22 @@ namespace flv {
             _bbox = cv::Rect2d(_lt, _rb);
         };
 
-        virtual ~Face<T>() = default;;
+        virtual ~Face<T>() = default;
 
         int get_left() const {
             return _left;
         }
 
         int get_top() const {
-            _top;
+            return _top;;
         }
 
         int get_right() const {
-            _right;
+            return _right;
         }
 
         int get_bottom() const {
-            _bottom;
+            return _bottom;
         }
 
         cv::Point get_lt() const {
