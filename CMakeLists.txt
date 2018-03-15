@@ -12,7 +12,15 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 
 find_package(OpenCV REQUIRED core highgui imgproc dnn)
 include_directories(${OpenCV_INCLUDE_DIRS})
-add_executable(FaclessVision main.cpp src/camera/CameraUtils.cpp src/camera/CameraUtils.h src/model/ModelUtils.cpp src/model/ModelUtils.h src/types/Face.h)
+add_executable(
+        FaclessVision
+        main.cpp
+        src/camera/CameraUtils.cpp src/camera/CameraUtils.h
+        src/model/ModelUtils.cpp src/model/ModelUtils.h
+        src/types/Face.h
+        src/utils/Constants.h
+        src/types/Eye.h
+)
 
-set(OpenCV_LIBS opencv_core opencv_imgproc opencv_highgui opencv_imgcodecs opencv_dnn opencv_tracking)
+set(OpenCV_LIBS opencv_core opencv_imgproc opencv_highgui opencv_imgcodecs opencv_dnn opencv_tracking opencv_objdetect)
 target_link_libraries(FaclessVision ${OpenCV_LIBS})

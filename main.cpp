@@ -5,6 +5,7 @@
 #include "src/camera/CameraUtils.h"
 #include "src/model/ModelUtils.h"
 #include "src/types/Face.h"
+#include "src/utils/Constants.h"
 
 #define TOP_LEFT_CORNER cv::Point(25, 25)
 #define DARK_GREEN cv::Scalar(50, 180, 0)
@@ -23,10 +24,15 @@ int main() {
     flv::CameraUtils::set_up(cap, cv::Size(width, height));
 
     auto fps = static_cast<int>(cap.get(CV_CAP_PROP_FPS));
-    auto net = cv::dnn::readNetFromCaffe(flv::FACE_DNN_PROTO, flv::FACE_DNN_MODEL);
+    auto net = cv::dnn::readNetFromCaffe(FACE_DNN_PROTO, FACE_DNN_MODEL);
 
     if (net.empty()) {
         return MODEL_NOT_AVAILABLE;
+    }
+
+    cv::CascadeClassifier eye_csf;
+    if (!eye_csf.load(EYE_HAAR_CASCADE)) {
+        return EYE_HAAR_CASCADE_NOT_AVAILABLE;
     }
 
     cv::Ptr<cv::Tracker> tracker = cv::TrackerKCF::create();
@@ -78,8 +84,23 @@ int main() {
             res.release();
         }
 
+        // TODO: update to track multiple faces
         if (tracker->update(frame, bbox)) {
             tracking = true;
+
+            std::vector<cv::Rect> eyes;
+
+            auto face = frame(bbox);
+            // TODO: too much noise -> use dlib
+            eye_csf.detectMultiScale(face, eyes);
+
+            for (const auto &eye : eyes) {
+                cv::Point eye_center(static_cast<int>(bbox.x + eye.x + eye.width / 2),
+                                     static_cast<int>(bbox.y + eye.y + eye.height / 2));
+                int radius = cvRound((eye.width + eye.height) * 0.25);
+                cv::circle(frame, eye_center, radius, DARK_BLUE, 4, 8, 0);
+            }
+
             cv::rectangle(frame, bbox, DARK_BLUE, 2);
             cv::putText(frame, "Tracking", bbox.tl(), CV_FONT_NORMAL, 0.5, DARK_BLUE);
         } else {

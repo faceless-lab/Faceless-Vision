@@ -2,10 +2,10 @@
 // Created by Andrei Nechaev on 3/13/18.
 //
 
-#pragma once
-
 #include <opencv2/core/types.hpp>
 #include <ostream>
+
+#pragma once
 
 namespace flv {
 

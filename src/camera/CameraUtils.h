@@ -6,8 +6,6 @@
 
 #pragma once
 
-#define CAMERA_NOT_AVAILABLE 1100
-
 namespace flv {
     class CameraUtils {
 
