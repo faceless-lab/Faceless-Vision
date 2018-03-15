@@ -2,6 +2,11 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/tracking.hpp>
 #include <opencv2/dnn/shape_utils.hpp>
+#include <dlib/image_processing/frontal_face_detector.h>
+#include <dlib/image_processing/render_face_detections.h>
+#include <dlib/image_processing/shape_predictor.h>
+#include <dlib/image_processing.h>
+#include <dlib/opencv.h>
 #include "src/camera/CameraUtils.h"
 #include "src/model/ModelUtils.h"
 #include "src/types/Face.h"
@@ -34,6 +39,11 @@ int main() {
     if (!eye_csf.load(EYE_HAAR_CASCADE)) {
         return EYE_HAAR_CASCADE_NOT_AVAILABLE;
     }
+
+    auto face_detector = dlib::get_frontal_face_detector();
+
+    dlib::shape_predictor shape_predictor;
+    dlib::deserialize(EYE_DLIB_PREDICTOR_MODEL) >> shape_predictor;
 
     cv::Ptr<cv::Tracker> tracker = cv::TrackerKCF::create();
     cv::Rect2d bbox;
@@ -93,6 +103,19 @@ int main() {
             auto face = frame(bbox);
             // TODO: too much noise -> use dlib
             eye_csf.detectMultiScale(face, eyes);
+
+            dlib::array2d<dlib::bgr_pixel> dl_img;
+            dlib::assign_image(dl_img, dlib::cv_image<dlib::bgr_pixel>(face));
+
+            dlib::rectangle rect;
+            rect.set_left(static_cast<long>(bbox.x));
+            rect.set_top(static_cast<long>(bbox.y));
+            rect.set_right(static_cast<long>(bbox.x + bbox.width));
+            rect.set_bottom(static_cast<long>(bbox.y + bbox.height));
+
+            // TODO: parse the shapes. Replace Face detection with dlib for speeding up the computation.
+            dlib::full_object_detection shape = shape_predictor(dl_img, rect);
+
 
             for (const auto &eye : eyes) {
                 cv::Point eye_center(static_cast<int>(bbox.x + eye.x + eye.width / 2),

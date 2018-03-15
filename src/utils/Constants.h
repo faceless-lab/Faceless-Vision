@@ -18,3 +18,4 @@
 #define FACE_DNN_PROTO "models/face/deploy.prototxt.txt"
 #define FACE_DNN_MODEL "models/face/res10_300x300_ssd_iter_140000.caffemodel"
 #define EYE_HAAR_CASCADE "models/eye/haarcascade_eye.xml"
+#define EYE_DLIB_PREDICTOR_MODEL "models/eye/shape_predictor_68_face_landmarks.dat"

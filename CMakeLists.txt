@@ -11,7 +11,12 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 #set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 find_package(OpenCV REQUIRED core highgui imgproc dnn)
-include_directories(${OpenCV_INCLUDE_DIRS})
+find_package(Dlib REQUIRED)
+message(STATUS "Using dlib-${Dlib_VERSION}")
+
+add_library(dlib SHARED IMPORTED)
+
+include_directories(${OpenCV_INCLUDE_DIRS} dlib::dlib)
 add_executable(
         FaclessVision
         main.cpp
@@ -23,4 +28,4 @@ add_executable(
 )
 
 set(OpenCV_LIBS opencv_core opencv_imgproc opencv_highgui opencv_imgcodecs opencv_dnn opencv_tracking opencv_objdetect)
-target_link_libraries(FaclessVision ${OpenCV_LIBS})
+target_link_libraries(FaclessVision ${OpenCV_LIBS} dlib::dlib)
