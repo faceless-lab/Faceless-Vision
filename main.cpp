@@ -11,6 +11,7 @@
 #include "src/model/ModelUtils.h"
 #include "src/types/Face.h"
 #include "src/utils/Constants.h"
+#include "src/utils/Helpers.h"
 
 #define TOP_LEFT_CORNER cv::Point(25, 25)
 #define DARK_GREEN cv::Scalar(50, 180, 0)
@@ -18,6 +19,7 @@
 
 const int width = 300;
 const int height = 300;
+
 
 int main() {
     auto cap = cv::VideoCapture(0);
@@ -86,7 +88,10 @@ int main() {
                     cv::putText(frame, stream.str(), lt, CV_FONT_NORMAL, 0.5, DARK_GREEN);
 
                     bbox = face.get_bbox();
+
                     tracker->init(frame, bbox);
+
+                    std::cout << "Find a face; attempting to track\n";
                 }
             }
 
@@ -98,30 +103,30 @@ int main() {
         if (tracker->update(frame, bbox)) {
             tracking = true;
 
-            std::vector<cv::Rect> eyes;
+            if (is_inside(bbox, frame)) {
+                auto face = frame(bbox);
+                std::vector<cv::Rect> eyes;
+                // TODO: too much noise -> use dlib
+                eye_csf.detectMultiScale(face, eyes);
 
-            auto face = frame(bbox);
-            // TODO: too much noise -> use dlib
-            eye_csf.detectMultiScale(face, eyes);
+                // dlib::array2d<dlib::bgr_pixel> dl_img;
+                // dlib::assign_image(dl_img, dlib::cv_image<dlib::bgr_pixel>(face));
 
-            dlib::array2d<dlib::bgr_pixel> dl_img;
-            dlib::assign_image(dl_img, dlib::cv_image<dlib::bgr_pixel>(face));
+                // dlib::rectangle rect;
+                // rect.set_left(static_cast<long>(bbox.x));
+                // rect.set_top(static_cast<long>(bbox.y));
+                // rect.set_right(static_cast<long>(bbox.x + bbox.width));
+                // rect.set_bottom(static_cast<long>(bbox.y + bbox.height));
 
-            dlib::rectangle rect;
-            rect.set_left(static_cast<long>(bbox.x));
-            rect.set_top(static_cast<long>(bbox.y));
-            rect.set_right(static_cast<long>(bbox.x + bbox.width));
-            rect.set_bottom(static_cast<long>(bbox.y + bbox.height));
+                // // TODO: parse the shapes. Replace Face detection with dlib for speeding up the computation.
+                // dlib::full_object_detection shape = shape_predictor(dl_img, rect);
 
-            // TODO: parse the shapes. Replace Face detection with dlib for speeding up the computation.
-            dlib::full_object_detection shape = shape_predictor(dl_img, rect);
-
-
-            for (const auto &eye : eyes) {
-                cv::Point eye_center(static_cast<int>(bbox.x + eye.x + eye.width / 2),
-                                     static_cast<int>(bbox.y + eye.y + eye.height / 2));
-                int radius = cvRound((eye.width + eye.height) * 0.25);
-                cv::circle(frame, eye_center, radius, DARK_BLUE, 4, 8, 0);
+                for (const auto &eye : eyes) {
+                    cv::Point eye_center(static_cast<int>(bbox.x + eye.x + eye.width / 2),
+                                         static_cast<int>(bbox.y + eye.y + eye.height / 2));
+                    int radius = cvRound((eye.width + eye.height) * 0.25);
+                    cv::circle(frame, eye_center, radius, DARK_BLUE, 4, 8, 0);
+                }
             }
 
             cv::rectangle(frame, bbox, DARK_BLUE, 2);

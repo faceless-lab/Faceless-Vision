@@ -1,6 +1,10 @@
 
 # Created by https://www.gitignore.io/api/c++,clion,cmake
 
+### OS X ###
+
+.DS_Store
+
 ### C++ ###
 # Prerequisites
 *.d

@@ -25,7 +25,7 @@ add_executable(
         src/types/Face.h
         src/utils/Constants.h
         src/types/Eye.h
-)
+        src/utils/Helpers.h)
 
 set(OpenCV_LIBS opencv_core opencv_imgproc opencv_highgui opencv_imgcodecs opencv_dnn opencv_tracking opencv_objdetect)
 target_link_libraries(FaclessVision ${OpenCV_LIBS} dlib::dlib)
