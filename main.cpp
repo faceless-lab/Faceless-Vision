@@ -47,7 +47,9 @@ int main() {
     dlib::shape_predictor shape_predictor;
     dlib::deserialize(EYE_DLIB_PREDICTOR_MODEL) >> shape_predictor;
 
-    cv::Ptr<cv::Tracker> tracker = cv::TrackerKCF::create();
+    // TODO: MultiTracker needed. Seems we need a custom implementation.
+    auto tracker = cv::TrackerKCF::create();
+
     cv::Rect2d bbox;
     bool tracking = false;
     while (true) {
@@ -59,6 +61,9 @@ int main() {
             continue;
         }
         cv::flip(frame, frame, 1);
+
+        cv::Mat gray{};
+        cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
 
         if (!tracking) {
             cv::Mat blob;
@@ -89,7 +94,7 @@ int main() {
 
                     bbox = face.get_bbox();
 
-                    tracker->init(frame, bbox);
+                    tracker->init(gray, bbox);
 
                     std::cout << "Find a face; attempting to track\n";
                 }
@@ -100,14 +105,15 @@ int main() {
         }
 
         // TODO: update to track multiple faces
-        if (tracker->update(frame, bbox)) {
+        if (tracker->update(gray, bbox)) {
             tracking = true;
 
-            if (is_inside(bbox, frame)) {
-                auto face = frame(bbox);
+            if (is_inside(bbox, gray)) {
+                auto face = gray(bbox);
+
                 std::vector<cv::Rect> eyes;
-                // TODO: too much noise -> use dlib
-                eye_csf.detectMultiScale(face, eyes);
+
+                eye_csf.detectMultiScale(face, eyes, 1.1, 8);
 
                 // dlib::array2d<dlib::bgr_pixel> dl_img;
                 // dlib::assign_image(dl_img, dlib::cv_image<dlib::bgr_pixel>(face));
