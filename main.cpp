@@ -7,11 +7,13 @@
 #include <dlib/image_processing/shape_predictor.h>
 #include <dlib/image_processing.h>
 #include <dlib/opencv.h>
+#include <uWS/uWS.h>
 #include "src/camera/CameraUtils.h"
 #include "src/model/ModelUtils.h"
 #include "src/types/Face.h"
 #include "src/utils/Constants.h"
 #include "src/utils/Helpers.h"
+#include "src/detector/Detector.h"
 
 #define TOP_LEFT_CORNER cv::Point(25, 25)
 #define DARK_GREEN cv::Scalar(50, 180, 0)
@@ -22,6 +24,20 @@ const int height = 300;
 
 
 int main() {
+    uWS::Hub hub;
+
+    hub.onConnection([&hub](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) {
+        std::cout << "Connected!!!\n";
+    });
+
+    hub.onDisconnection([&hub](uWS::WebSocket<uWS::SERVER> ws, int code, char *message, size_t length) {
+        ws.close();
+        std::cout << "Disconnected\n";
+    });
+
+    hub.listen(8787);
+    hub.run();
+
     auto cap = cv::VideoCapture(0);
 
     if (!cap.isOpened()) {
@@ -48,9 +64,11 @@ int main() {
     dlib::deserialize(EYE_DLIB_PREDICTOR_MODEL) >> shape_predictor;
 
     // TODO: MultiTracker needed. Seems we need a custom implementation.
-    auto tracker = cv::TrackerKCF::create();
+//    auto tracker = cv::TrackerKCF::create();
 
-    cv::Rect2d bbox;
+    flv::detect::Detector detector("KCF");
+
+//    cv::Rect2d bbox;
     bool tracking = false;
     while (true) {
         int64 start = cv::getTickCount();
@@ -74,6 +92,8 @@ int main() {
 
             res = res.reshape(1, static_cast<int>(res.total() / 7));
 
+            std::vector<cv::Rect2d> faces{};
+
             for (int i = 0; i < res.rows; i++) {
                 float confidence = res.at<float>(i, 2);
 
@@ -92,60 +112,68 @@ int main() {
                     stream << "Confidence:" << std::setprecision(2) << confidence;
                     cv::putText(frame, stream.str(), lt, CV_FONT_NORMAL, 0.5, DARK_GREEN);
 
-                    bbox = face.get_bbox();
+//                    bbox = face.get_bbox();
+                    faces.push_back(face.get_bbox());
 
-                    tracker->init(gray, bbox);
+//                    tracker->init(gray, bbox);
 
-                    std::cout << "Find a face; attempting to track\n";
+//                    std::cout << "Find a face; attempting to track\n";
                 }
             }
+
+            detector.track(gray, faces);
 
             blob.release();
             res.release();
         }
 
         // TODO: update to track multiple faces
-        if (tracker->update(gray, bbox)) {
+//        if (tracker->update(gray, bbox)) {
+        if (detector.update(gray)) {
             tracking = true;
 
-            if (is_inside(bbox, gray)) {
-                auto face = gray(bbox);
+            for (auto bbox : detector.get_bboxes()) {
+                if (is_inside(bbox, gray)) {
+                    auto face = gray(bbox);
 
-                std::vector<cv::Rect> eyes;
+                    std::vector<cv::Rect> eyes;
 
-                eye_csf.detectMultiScale(face, eyes, 1.1, 8);
+                    eye_csf.detectMultiScale(face, eyes, 1.05, 6, 0, cv::Size(30, 30), cv::Size(80, 80));
 
-                // dlib::array2d<dlib::bgr_pixel> dl_img;
-                // dlib::assign_image(dl_img, dlib::cv_image<dlib::bgr_pixel>(face));
+                    // dlib::array2d<dlib::bgr_pixel> dl_img;
+                    // dlib::assign_image(dl_img, dlib::cv_image<dlib::bgr_pixel>(face));
 
-                // dlib::rectangle rect;
-                // rect.set_left(static_cast<long>(bbox.x));
-                // rect.set_top(static_cast<long>(bbox.y));
-                // rect.set_right(static_cast<long>(bbox.x + bbox.width));
-                // rect.set_bottom(static_cast<long>(bbox.y + bbox.height));
+                    // dlib::rectangle rect;
+                    // rect.set_left(static_cast<long>(bbox.x));
+                    // rect.set_top(static_cast<long>(bbox.y));
+                    // rect.set_right(static_cast<long>(bbox.x + bbox.width));
+                    // rect.set_bottom(static_cast<long>(bbox.y + bbox.height));
 
-                // // TODO: parse the shapes. Replace Face detection with dlib for speeding up the computation.
-                // dlib::full_object_detection shape = shape_predictor(dl_img, rect);
+                    // // TODO: parse the shapes. Replace Face detection with dlib for speeding up the computation.
+                    // dlib::full_object_detection shape = shape_predictor(dl_img, rect);
 
-                for (const auto &eye : eyes) {
-                    cv::Point eye_center(static_cast<int>(bbox.x + eye.x + eye.width / 2),
-                                         static_cast<int>(bbox.y + eye.y + eye.height / 2));
-                    int radius = cvRound((eye.width + eye.height) * 0.25);
-                    cv::circle(frame, eye_center, radius, DARK_BLUE, 4, 8, 0);
+                    for (const auto &eye : eyes) {
+                        cv::Point eye_center(static_cast<int>(bbox.x + eye.x + eye.width / 2),
+                                             static_cast<int>(bbox.y + eye.y + eye.height / 2));
+                        int radius = cvRound((eye.width + eye.height) * 0.25);
+                        cv::circle(frame, eye_center, radius, DARK_BLUE, 4, 8, 0);
+                    }
                 }
-            }
 
-            cv::rectangle(frame, bbox, DARK_BLUE, 2);
-            cv::putText(frame, "Tracking", bbox.tl(), CV_FONT_NORMAL, 0.5, DARK_BLUE);
+                cv::rectangle(frame, bbox, DARK_BLUE, 2);
+                cv::putText(frame, "Tracking", bbox.tl(), CV_FONT_NORMAL, 0.5, DARK_BLUE);
+            }
         } else {
             tracking = false;
-            tracker.release();
-            tracker = cv::TrackerKCF::create();
+            detector.cleanup();
+//            tracker.release();
+//            tracker = cv::TrackerKCF::create();
         }
 
         std::stringstream stream;
         stream << "FPS:" << std::setprecision(2) << fps;
         cv::putText(frame, stream.str(), TOP_LEFT_CORNER, CV_FONT_NORMAL, 1, DARK_GREEN);
+
 
         cv::imshow("Visor", frame);
 
@@ -156,7 +184,8 @@ int main() {
         fps = static_cast<int>(cv::getTickFrequency() / (cv::getTickCount() - start));
     }
 
-    tracker.release();
+    detector.cleanup();
+//    tracker.release();
     cap.release();
 
     std::cout << "End of program\n";
